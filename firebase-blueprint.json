@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "Booking": {
+      "title": "Booking",
+      "description": "A booking record for a room.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "The UID of the property owner." },
+        "status": { "type": "string", "description": "Booking status (e.g., โอนแล้ว, Pending)." },
+        "bookingDate": { "type": "string", "format": "date", "description": "Date the booking was made." },
+        "guestName": { "type": "string", "description": "Name of the guest." },
+        "phone": { "type": "string", "description": "Phone number of the guest." },
+        "roomType": { "type": "string", "description": "Type of room booked." },
+        "checkIn": { "type": "string", "format": "date", "description": "Check-in date." },
+        "checkOut": { "type": "string", "format": "date", "description": "Check-out date." },
+        "amount": { "type": "number", "description": "Total amount paid." },
+        "roomStatus": { "type": "string", "description": "Status of the room (e.g., จองแล้ว)." },
+        "slip": { "type": "string", "description": "URL or reference to the payment slip." },
+        "note": { "type": "string", "description": "Additional notes." },
+        "source": { "type": "string", "description": "Source of the booking (e.g., Facebook, Line)." }
+      },
+      "required": ["ownerId", "guestName", "roomType", "checkIn", "checkOut", "amount"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "A room available for booking.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "The UID of the property owner." },
+        "id": { "type": "string", "description": "Unique room ID." },
+        "name": { "type": "string", "description": "Name of the room." },
+        "description": { "type": "string", "description": "Description of the room." },
+        "amenities": { "type": "string", "description": "List of amenities." },
+        "price": { "type": "number", "description": "Price per night." },
+        "status": { "type": "string", "description": "Availability status." },
+        "imageUrl": { "type": "string", "description": "URL of the room image." },
+        "capacity": { "type": "string", "description": "Capacity of the room." }
+      },
+      "required": ["ownerId", "id", "name", "price"]
+    },
+    "Promo": {
+      "title": "Promo",
+      "description": "A promotional offer.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "The UID of the property owner." },
+        "name": { "type": "string", "description": "Name of the promo." },
+        "discount": { "type": "string", "description": "Discount amount or percentage." },
+        "startDate": { "type": "string", "format": "date", "description": "Start date of the promo." },
+        "endDate": { "type": "string", "format": "date", "description": "End date of the promo." },
+        "status": { "type": "string", "description": "Status of the promo." }
+      },
+      "required": ["ownerId", "name", "discount"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Property settings and contact information.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "The UID of the property owner." },
+        "homestayName": { "type": "string" },
+        "homestaySuffix": { "type": "string" },
+        "heroSloganTop": { "type": "string" },
+        "heroDescription": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactLineId": { "type": "string" },
+        "contactFacebookUrl": { "type": "string" },
+        "contactAddress": { "type": "string" },
+        "bankName": { "type": "string" },
+        "bankAccountNo": { "type": "string" },
+        "bankAccountName": { "type": "string" },
+        "promptPayId": { "type": "string" },
+        "themePreset": { "type": "string" },
+        "fontStyle": { "type": "string" }
+      },
+      "required": ["ownerId", "homestayName"]
+    }
+  },
+  "firestore": {
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Collection of bookings."
+    },
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Collection of rooms."
+    },
+    "/promos/{promoId}": {
+      "schema": "Promo",
+      "description": "Collection of promos."
+    },
+    "/settings/{settingsId}": {
+      "schema": "Settings",
+      "description": "Collection of property settings."
+    }
+  }
+}

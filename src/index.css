@@ -1,0 +1,39 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@100;200;300;400;500;600;700;800&display=swap');
+
+@theme {
+  --font-serif: "Sarabun", sans-serif;
+  --font-sans: "Sarabun", sans-serif;
+  
+  --color-mountain-mist: #f4f7f5;
+  --color-mountain-forest: #1b3a2e;
+  --color-mountain-earth: #4e342e;
+  --color-mountain-gold: #a67c00;
+  --color-mountain-slate: #37474f;
+  
+  /* Legacy mapping for compatibility */
+  --color-luxury-cream: var(--color-mountain-mist);
+  --color-luxury-ink: var(--color-mountain-forest);
+  --color-luxury-gold: var(--color-mountain-gold);
+  --color-luxury-stone: var(--color-mountain-slate);
+}
+
+body {
+  @apply bg-mountain-mist text-mountain-forest font-sans antialiased;
+}
+
+h1, h2, h3, h4, .serif {
+  @apply font-sans font-bold;
+}
+
+.luxury-card {
+  @apply bg-white border border-mountain-forest/10 rounded-xl shadow-sm transition-all duration-300 hover:shadow-lg;
+}
+
+.luxury-input {
+  @apply w-full bg-white border border-mountain-forest/20 rounded-lg px-4 py-3 focus:border-mountain-forest focus:ring-1 focus:ring-mountain-forest outline-none transition-all;
+}
+
+.luxury-button {
+  @apply bg-mountain-forest text-white px-10 py-5 uppercase tracking-[0.2em] text-sm font-bold rounded-xl shadow-lg hover:bg-mountain-forest/90 hover:shadow-xl active:scale-95 transition-all duration-300 disabled:opacity-50;
+}
