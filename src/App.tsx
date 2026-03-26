@@ -15,6 +15,7 @@ import {
   Users, 
   DollarSign,
   ChevronRight,
+  ChevronLeft,
   Menu,
   X,
   Loader2,
@@ -63,7 +64,8 @@ import {
   subMonths,
   startOfWeek,
   endOfWeek,
-  addDays
+  addDays,
+  subDays
 } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { auth, db } from './firebase';
@@ -186,7 +188,206 @@ interface Room {
   amenities: string;
 }
 
+// --- Helper for robust date parsing ---
+const parseDate = (dateStr: any) => {
+  if (!dateStr) return new Date(NaN);
+  if (dateStr instanceof Date) return dateStr;
+  
+  // Try ISO format (YYYY-MM-DD)
+  let d = parseISO(dateStr);
+  if (!isNaN(d.getTime())) return d;
+  
+  // Try DD/MM/YYYY format
+  if (typeof dateStr === 'string' && dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      // Assume DD/MM/YYYY if first part is not 4 digits
+      if (parts[0].length !== 4) {
+        d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      } else {
+        d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  
+  // Try native Date constructor as last resort
+  d = new Date(dateStr);
+  return d;
+};
+
 // --- Components ---
+
+const LuxuryDatePicker = ({ 
+  label, 
+  value, 
+  onChange, 
+  minDate,
+  roomType,
+  bookings
+}: {
+  label: string;
+  value: string;
+  onChange: (date: string) => void;
+  minDate?: Date;
+  roomType?: string;
+  bookings: any[];
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(value ? parseDate(value) : (minDate || new Date()));
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const monthStart = startOfMonth(viewDate);
+  const monthEnd = endOfMonth(monthStart);
+  const startDate = startOfWeek(monthStart);
+  const endDate = endOfWeek(monthEnd);
+  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+  const isBooked = (day: Date) => {
+    if (!roomType || !bookings) return false;
+    const dayStart = startOfDay(day);
+    const normalizedRoomType = roomType.trim().toLowerCase();
+    
+    return bookings.some(b => {
+      if (!b.roomType || b.status === 'ยกเลิกเรียบร้อย') return false;
+      const bRoomType = b.roomType.trim().toLowerCase();
+      
+      // Flexible matching: exact match or one contains the other (to handle "Room Name" vs "Room Name 2" confusion)
+      const isMatch = bRoomType === normalizedRoomType || 
+                     bRoomType.includes(normalizedRoomType) || 
+                     normalizedRoomType.includes(bRoomType);
+                     
+      if (!isMatch) return false;
+      
+      const start = startOfDay(parseDate(b.checkIn));
+      const end = startOfDay(parseDate(b.checkOut));
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+      
+      // Standard hotel booking: booked from check-in day up to (but not including) check-out day
+      return dayStart >= start && dayStart < end;
+    });
+  };
+
+  const isPast = (day: Date) => {
+    if (!minDate) return false;
+    return startOfDay(day) < startOfDay(minDate);
+  };
+
+  const dayString = (d: Date) => format(d, 'yyyy-MM-dd');
+
+  return (
+    <div className="flex flex-col gap-2 relative" ref={containerRef}>
+      <label className="text-[10px] uppercase tracking-widest text-luxury-stone font-semibold">{label}</label>
+      <button 
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="luxury-input flex items-center justify-between text-left h-[42px]"
+      >
+        <span className="text-sm">{value ? format(parseDate(value), 'dd/MM/yyyy') : 'เลือกวันที่...'}</span>
+        <Calendar className="w-4 h-4 text-luxury-stone" />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute top-full left-0 mt-2 z-[100] bg-white shadow-2xl border border-luxury-ink/5 p-4 w-72 rounded-xl"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <button type="button" onClick={() => setViewDate(subMonths(viewDate, 1))} className="p-1 hover:bg-luxury-cream rounded-full transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="font-serif text-sm">{format(viewDate, 'MMMM yyyy', { locale: th })}</span>
+              <button type="button" onClick={() => setViewDate(addMonths(viewDate, 1))} className="p-1 hover:bg-luxury-cream rounded-full transition-colors">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 mb-2">
+              {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(d => (
+                <div key={d} className="text-center text-[8px] font-bold text-luxury-stone uppercase py-1">{d}</div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+              {calendarDays.map((day, i) => {
+                const booked = isBooked(day);
+                const past = isPast(day);
+                const isSelected = value && dayString(day) === dayString(parseDate(value));
+                const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(viewDate));
+                const isToday = isSameDay(day, new Date());
+
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={past || booked}
+                    onClick={() => {
+                      onChange(format(day, 'yyyy-MM-dd'));
+                      setIsOpen(false);
+                    }}
+                    className={`
+                      aspect-square p-1 flex flex-col items-center justify-center transition-all relative text-[10px]
+                      ${isSelected ? 'bg-luxury-ink text-white z-10' : (isCurrentMonth ? 'bg-white text-luxury-ink' : 'bg-gray-50 text-gray-300')}
+                      ${!isSelected && !booked ? 'hover:bg-luxury-cream' : ''}
+                      ${isToday && !isSelected && !booked ? 'text-luxury-gold font-bold ring-1 ring-inset ring-luxury-gold/30' : ''}
+                      ${past ? 'opacity-30 cursor-not-allowed grayscale' : ''}
+                    `}
+                  >
+                    <span className={isSelected ? 'font-bold' : ''}>{format(day, 'd')}</span>
+                    {isToday && !booked && !isSelected && (
+                      <div className="w-1 h-1 bg-luxury-gold rounded-full absolute bottom-1" />
+                    )}
+                    {booked && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-600 border border-red-700 z-20 shadow-inner">
+                        <span className="text-[10px] font-bold text-white leading-none">{format(day, 'd')}</span>
+                        <span className="text-[7px] font-black uppercase text-white leading-none mt-1">จอง</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+              <button 
+                type="button" 
+                onClick={() => {
+                  onChange(format(new Date(), 'yyyy-MM-dd'));
+                  setViewDate(new Date());
+                  setIsOpen(false);
+                }}
+                className="text-[10px] font-bold text-luxury-gold uppercase tracking-widest hover:underline"
+              >
+                วันนี้
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setIsOpen(false)}
+                className="text-[10px] font-bold text-luxury-stone uppercase tracking-widest hover:underline"
+              >
+                ปิด
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 const LoginScreen = ({ 
   onGoogleLogin, 
@@ -394,6 +595,50 @@ export default function App() {
     originalAmount: 0
   });
   const [submitting, setSubmitting] = useState(false);
+  const [occupiedRooms, setOccupiedRooms] = useState<string[]>([]);
+
+  const checkAvailability = (roomType: string, checkIn: string, checkOut: string) => {
+    if (!checkIn || !checkOut) return true;
+    
+    const start = parseDate(checkIn);
+    const end = parseDate(checkOut);
+    const normalizedRoomType = roomType.trim().toLowerCase();
+    
+    return !data.bookings.some(booking => {
+      if (!booking.roomType || booking.status === 'ยกเลิกเรียบร้อย') return false;
+      if (booking.roomType.trim().toLowerCase() !== normalizedRoomType) return false;
+      
+      const bStart = parseDate(booking.checkIn);
+      const bEnd = parseDate(booking.checkOut);
+      
+      // Overlap check: (StartA < EndB) and (EndA > StartB)
+      return start < bEnd && end > bStart;
+    });
+  };
+
+  const getOccupiedRooms = (checkIn: string, checkOut: string) => {
+    if (!checkIn || !checkOut) return [];
+    
+    const start = parseDate(checkIn);
+    const end = parseDate(checkOut);
+    
+    const occupied = data.bookings
+      .filter(booking => {
+        if (booking.status === 'ยกเลิกเรียบร้อย' || !booking.roomType) return false;
+        const bStart = parseDate(booking.checkIn);
+        const bEnd = parseDate(booking.checkOut);
+        return start < bEnd && end > bStart;
+      })
+      .map(b => b.roomType.trim());
+      
+    return Array.from(new Set(occupied));
+  };
+
+  useEffect(() => {
+    if (activeTab === 'new-booking') {
+      setOccupiedRooms(getOccupiedRooms(bookingForm.checkIn, bookingForm.checkOut));
+    }
+  }, [bookingForm.checkIn, bookingForm.checkOut, data.bookings, activeTab]);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [roomForm, setRoomForm] = useState({
     name: '',
@@ -891,6 +1136,13 @@ export default function App() {
       alert('กรุณาเข้าสู่ระบบก่อนดำเนินการ');
       return;
     }
+
+    // Double booking check
+    if (!checkAvailability(bookingForm.roomType, bookingForm.checkIn, bookingForm.checkOut)) {
+      alert(`ขออภัย ห้อง ${bookingForm.roomType} ถูกจองแล้วในช่วงวันที่เลือก กรุณาเลือกห้องอื่นหรือเปลี่ยนวันที่`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const newBooking: Omit<Booking, 'id'> = {
@@ -1973,7 +2225,7 @@ export default function App() {
                   <label className="text-[10px] uppercase tracking-widest text-luxury-stone font-semibold">ประเภทห้องพัก</label>
                   <select 
                     required
-                    className="luxury-input"
+                    className={`luxury-input ${occupiedRooms.includes(bookingForm.roomType) ? 'border-red-500 text-red-500' : ''}`}
                     value={bookingForm.roomType}
                     onChange={e => {
                       const room = data.rooms.find(r => r.name === e.target.value);
@@ -1987,33 +2239,54 @@ export default function App() {
                     }}
                   >
                     <option value="">เลือกประเภทห้องพัก...</option>
-                    {data.rooms.map((room, i) => (
-                      <option key={`opt-${room.id || i}`} value={room.name}>{room.name} (฿{room.price})</option>
-                    ))}
+                    {data.rooms.map((room, i) => {
+                      const isOccupied = occupiedRooms.some(name => name.trim().toLowerCase() === room.name.trim().toLowerCase());
+                      return (
+                        <option 
+                          key={`opt-${room.id || i}`} 
+                          value={room.name}
+                          className={isOccupied ? 'text-red-500' : ''}
+                        >
+                          {room.name} (฿{room.price}) {isOccupied ? '[ถูกจองแล้ว]' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
+                  {occupiedRooms.length > 0 && (
+                    <div className="mt-2 p-4 bg-red-50 border border-red-100 rounded-xl">
+                      <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        วันนี้มีคนจองห้องพัก ดังนี้:
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {occupiedRooms.map(roomName => (
+                          <div key={roomName} className="flex items-center justify-between px-3 py-2 bg-white border border-red-100 rounded-lg shadow-sm">
+                            <span className="text-[11px] font-bold text-red-700">{roomName}</span>
+                            <span className="text-[9px] font-black uppercase text-red-500 bg-red-50 px-2 py-0.5 rounded">ถูกจองแล้ว</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase tracking-widest text-luxury-stone font-semibold">วันที่เช็คอิน</label>
-                    <input 
-                      required
-                      type="date" 
-                      className="luxury-input" 
-                      value={bookingForm.checkIn}
-                      onChange={e => setBookingForm({...bookingForm, checkIn: e.target.value})}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase tracking-widest text-luxury-stone font-semibold">วันที่เช็คเอาท์</label>
-                    <input 
-                      required
-                      type="date" 
-                      className="luxury-input" 
-                      value={bookingForm.checkOut}
-                      onChange={e => setBookingForm({...bookingForm, checkOut: e.target.value})}
-                    />
-                  </div>
+                  <LuxuryDatePicker 
+                    label="วันที่เช็คอิน"
+                    value={bookingForm.checkIn}
+                    onChange={date => setBookingForm({...bookingForm, checkIn: date})}
+                    minDate={new Date()}
+                    roomType={bookingForm.roomType}
+                    bookings={data.bookings}
+                  />
+                  <LuxuryDatePicker 
+                    label="วันที่เช็คเอาท์"
+                    value={bookingForm.checkOut}
+                    onChange={date => setBookingForm({...bookingForm, checkOut: date})}
+                    minDate={addDays(parseISO(bookingForm.checkIn), 1)}
+                    roomType={bookingForm.roomType}
+                    bookings={data.bookings}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
