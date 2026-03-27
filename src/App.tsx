@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -390,17 +390,12 @@ const LuxuryDatePicker = ({
 };
 
 const LoginScreen = ({ 
-  onGoogleLogin, 
   onEmailLogin, 
-  onEmailSignUp,
   homestayName = 'Loei'
 }: { 
-  onGoogleLogin: () => void,
   onEmailLogin: (e: string, p: string) => Promise<void>,
-  onEmailSignUp: (e: string, p: string) => Promise<void>,
   homestayName?: string
 }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -412,11 +407,7 @@ const LoginScreen = ({
     setError('');
     setLoading(true);
     try {
-      if (isSignUp) {
-        await onEmailSignUp(email, password);
-      } else {
-        await onEmailLogin(email, password);
-      }
+      await onEmailLogin(email, password);
     } catch (err: any) {
       console.error("Auth error:", err);
       let message = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
@@ -462,7 +453,7 @@ const LoginScreen = ({
               <input 
                 type="email" 
                 required
-                className="luxury-input pl-12" 
+                className="luxury-input !pl-14" 
                 placeholder="example@resort.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -477,7 +468,7 @@ const LoginScreen = ({
               <input 
                 type={showPassword ? "text" : "password"} 
                 required
-                className="luxury-input pl-12 pr-12" 
+                className="luxury-input !pl-14 !pr-14" 
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -499,35 +490,9 @@ const LoginScreen = ({
             disabled={loading}
             className="w-full py-4 bg-luxury-ink text-white font-bold uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-mountain-forest transition-all duration-500 shadow-xl disabled:opacity-50"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isSignUp ? 'สร้างบัญชี' : 'เข้าสู่ระบบ')}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'เข้าสู่ระบบ'}
           </button>
         </form>
-
-        <div className="w-full flex items-center gap-4">
-          <div className="flex-1 h-[1px] bg-luxury-stone/20" />
-          <span className="text-[10px] text-luxury-stone uppercase tracking-widest">หรือ</span>
-          <div className="flex-1 h-[1px] bg-luxury-stone/20" />
-        </div>
-
-        <button 
-          type="button"
-          onClick={onGoogleLogin}
-          className="w-full py-4 border border-luxury-ink/10 text-luxury-ink font-bold uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-luxury-cream transition-all duration-500 group"
-        >
-          <LogIn className="w-4 h-4 group-hover:scale-110 transition-transform" />
-          เข้าสู่ระบบด้วย Google
-        </button>
-
-        <button 
-          type="button"
-          onClick={() => {
-            setIsSignUp(!isSignUp);
-            setError('');
-          }}
-          className="text-[10px] uppercase tracking-widest text-luxury-stone hover:text-luxury-ink transition-colors font-bold"
-        >
-          {isSignUp ? 'มีบัญชีอยู่แล้ว? เข้าสู่ระบบ' : 'ยังไม่มีบัญชี? สร้างบัญชีใหม่'}
-        </button>
       </motion.div>
     </div>
   );
@@ -557,9 +522,188 @@ const LuxuryCard = ({ title, value, icon: Icon, trend, delay = 0 }: { title: str
   </motion.div>
 );
 
+const WelcomeScreen = ({ onOpenConfig }: { onOpenConfig: () => void }) => (
+  <div className="h-screen w-full flex items-center justify-center bg-luxury-cream p-6">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-2xl w-full text-center space-y-8"
+    >
+      <div className="space-y-4">
+        <div className="w-20 h-20 bg-mountain-forest/10 rounded-full flex items-center justify-center mx-auto mb-8">
+          <Database className="w-10 h-10 text-mountain-forest" />
+        </div>
+        <h1 className="text-5xl font-serif text-luxury-ink">ยินดีต้อนรับสู่ระบบจัดการที่พัก</h1>
+        <p className="text-lg text-luxury-stone font-serif italic">
+          ก้าวแรกสู่การจัดการที่พักอย่างมืออาชีพ กรุณาเชื่อมต่อ Google Sheet ของคุณเพื่อเริ่มต้นใช้งาน
+        </p>
+      </div>
+      
+      <div className="grid md:grid-cols-3 gap-6 text-left">
+        {[
+          { icon: FileText, title: "1. ก๊อปปี้ชีต", desc: "ใช้ไฟล์ต้นแบบที่เราเตรียมไว้ให้" },
+          { icon: ShieldCheck, title: "2. แชร์สิทธิ์", desc: "แชร์สิทธิ์ Editor ให้เมลระบบ" },
+          { icon: RefreshCw, title: "3. เชื่อมต่อ", desc: "ใส่ Spreadsheet ID แล้วเริ่มงานได้เลย" }
+        ].map((step, i) => (
+          <div key={i} className="luxury-card p-6 space-y-3">
+            <step.icon className="w-6 h-6 text-mountain-gold" />
+            <h3 className="font-bold text-xs uppercase tracking-widest">{step.title}</h3>
+            <p className="text-[10px] text-luxury-stone leading-relaxed">{step.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <button 
+        onClick={onOpenConfig}
+        className="px-12 py-5 bg-luxury-ink text-white font-bold uppercase tracking-[0.3em] text-xs hover:bg-mountain-forest transition-all duration-500 shadow-2xl"
+      >
+        ตั้งค่า Google Sheet ทันที
+      </button>
+    </motion.div>
+  </div>
+);
+
+const SheetErrorScreen = ({ error, onOpenConfig }: { error: { status: number, message: string }, onOpenConfig: () => void }) => (
+  <div className="h-screen w-full flex items-center justify-center bg-luxury-cream p-6">
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="max-w-md w-full luxury-card p-10 text-center space-y-6 border-red-100"
+    >
+      <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+        <AlertCircle className="w-8 h-8 text-red-500" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-2xl font-serif text-luxury-ink">การเชื่อมต่อผิดพลาด</h2>
+        <p className="text-xs text-red-500 font-bold uppercase tracking-widest">
+          {error.status === 403 ? "ไม่มีสิทธิ์เข้าถึงไฟล์" : error.status === 404 ? "ไม่พบไฟล์ที่ระบุ" : "เกิดข้อผิดพลาดทางเทคนิค"}
+        </p>
+        <p className="text-sm text-luxury-stone leading-relaxed">
+          {error.message}
+        </p>
+      </div>
+      
+      <div className="pt-4 space-y-3">
+        <button 
+          onClick={onOpenConfig}
+          className="w-full py-4 bg-luxury-ink text-white font-bold uppercase tracking-widest text-xs hover:bg-mountain-forest transition-all"
+        >
+          ตรวจสอบการตั้งค่า
+        </button>
+        <p className="text-[10px] text-luxury-stone italic">
+          *ตรวจสอบให้แน่ใจว่าคุณได้แชร์สิทธิ์ Editor ให้กับอีเมลของระบบแล้ว
+        </p>
+      </div>
+    </motion.div>
+  </div>
+);
+
+const SaaSConfigModal = ({ 
+  isOpen, 
+  onClose, 
+  currentId, 
+  serviceAccountEmail,
+  onSave 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  currentId: string | null, 
+  serviceAccountEmail?: string,
+  onSave: (id: string) => Promise<void> 
+}) => {
+  const [newId, setNewId] = useState(currentId || '');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setNewId(currentId || '');
+  }, [currentId]);
+
+  const handleSave = async () => {
+    setLoading(true);
+    await onSave(newId);
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-luxury-ink/60 backdrop-blur-sm"
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="luxury-card p-8 max-w-md w-full relative z-10"
+          >
+            <h2 className="text-2xl font-serif mb-6">ตั้งค่า Google Sheets (SaaS)</h2>
+            <p className="text-xs text-luxury-stone uppercase tracking-widest mb-4">
+              กรุณาระบุ Spreadsheet ID ของคุณเพื่อแยกข้อมูล
+            </p>
+            
+            <div className="bg-mountain-forest/5 p-4 rounded-xl mb-6 space-y-3 border border-mountain-forest/10">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-mountain-forest">อีเมลระบบสำหรับแชร์สิทธิ์ (Editor):</p>
+              <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-mountain-forest/20">
+                <code className="text-[10px] text-luxury-ink font-mono break-all">{serviceAccountEmail || 'กำลังโหลด...'}</code>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(serviceAccountEmail || '');
+                    alert('คัดลอกอีเมลแล้ว!');
+                  }}
+                  className="p-2 hover:bg-luxury-cream rounded-md transition-colors"
+                >
+                  <Copy className="w-3 h-3 text-luxury-stone" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-luxury-stone font-bold">Spreadsheet ID</label>
+                <input 
+                  type="text" 
+                  className="luxury-input" 
+                  placeholder="1abc123..."
+                  value={newId}
+                  onChange={(e) => setNewId(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button 
+                  onClick={onClose}
+                  className="flex-1 py-3 border border-luxury-ink/10 text-[10px] uppercase tracking-widest font-bold hover:bg-luxury-cream transition-all"
+                >
+                  ยกเลิก
+                </button>
+                <button 
+                  onClick={handleSave}
+                  disabled={loading}
+                  className="flex-1 py-3 bg-luxury-ink text-white text-[10px] uppercase tracking-widest font-bold hover:bg-mountain-forest transition-all flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  บันทึก
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
+  const [isSaaSConfigOpen, setIsSaaSConfigOpen] = useState(false);
+  const [fetchError, setFetchError] = useState<{ status: number, message: string } | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -658,6 +802,7 @@ export default function App() {
     status: 'Active'
   });
   const [showPromoForm, setShowPromoForm] = useState(false);
+  const firestoreUnsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const testConnection = async () => {
@@ -672,26 +817,54 @@ export default function App() {
     };
     testConnection();
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      // Unsubscribe from previous listeners if any
+      if (firestoreUnsubscribeRef.current) {
+        firestoreUnsubscribeRef.current();
+        firestoreUnsubscribeRef.current = null;
+      }
+
       setUser(currentUser);
-      setAuthLoading(false);
       if (currentUser) {
-        fetchFirestoreData(currentUser.uid);
+        // Fetch user config
+        try {
+          const configDoc = await getDoc(doc(db, 'userConfigs', currentUser.uid));
+          if (configDoc.exists()) {
+            const sid = configDoc.data().spreadsheetId;
+            setSpreadsheetId(sid);
+            if (!sid) {
+              setIsSaaSConfigOpen(true);
+            }
+          } else {
+            // First time login - open config modal
+            setIsSaaSConfigOpen(true);
+          }
+        } catch (error) {
+          console.error("Error fetching user config:", error);
+        }
+        firestoreUnsubscribeRef.current = fetchFirestoreData(currentUser.uid);
       } else {
+        setSpreadsheetId(null);
         fetchData(); // Public view or fallback
       }
+      setAuthLoading(false);
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (firestoreUnsubscribeRef.current) {
+        firestoreUnsubscribeRef.current();
+      }
+    };
   }, []);
 
   const [initialSyncDone, setInitialSyncDone] = useState(false);
 
   useEffect(() => {
-    if (user && !initialSyncDone) {
+    if (user && spreadsheetId && !initialSyncDone) {
       syncFromSheets(true);
       setInitialSyncDone(true);
     }
-  }, [user, initialSyncDone]);
+  }, [user, spreadsheetId, initialSyncDone]);
 
   const fetchFirestoreData = (uid: string) => {
     setLoading(true);
@@ -748,29 +921,34 @@ export default function App() {
     };
   };
 
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login failed:", error);
-    }
-  };
-
   const handleEmailLogin = async (email: string, p: string) => {
     await signInWithEmailAndPassword(auth, email, p);
-  };
-
-  const handleEmailSignUp = async (email: string, p: string) => {
-    await createUserWithEmailAndPassword(auth, email, p);
   };
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
       setData(prev => ({ ...prev, bookings: [] })); // Clear private data
+      setSpreadsheetId(null);
     } catch (error) {
       console.error("Logout failed:", error);
+    }
+  };
+
+  const handleSaveSaaSConfig = async (id: string) => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'userConfigs', user.uid), {
+        spreadsheetId: id,
+        updatedAt: Timestamp.now()
+      });
+      setSpreadsheetId(id);
+      setIsSaaSConfigOpen(false);
+      alert('บันทึกการตั้งค่าสำเร็จ! ระบบจะทำการโหลดข้อมูลใหม่');
+      await syncFromSheets(false, id);
+    } catch (error) {
+      console.error("Error saving user config:", error);
+      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
     }
   };
 
@@ -842,12 +1020,22 @@ export default function App() {
     }
   };
 
-  const syncFromSheets = async (silent = false) => {
+  const syncFromSheets = async (silent = false, overrideId?: string) => {
     if (!user) return;
     setLoading(true);
+    setFetchError(null);
     try {
-      const res = await fetch('/api/data');
-      if (!res.ok) throw new Error('Failed to fetch from Sheets');
+      const headers: any = { 'Content-Type': 'application/json' };
+      const sid = overrideId || spreadsheetId;
+      if (sid) {
+        headers['x-spreadsheet-id'] = sid;
+      }
+      const res = await fetch('/api/data', { headers });
+      if (!res.ok) {
+        const errorData = await res.json();
+        setFetchError({ status: res.status, message: errorData.details || errorData.error });
+        throw new Error('Failed to fetch from Sheets');
+      }
       const json = await res.json();
       
       // 1. Clear existing data for this user to prevent duplicates
@@ -1025,9 +1213,14 @@ export default function App() {
 
       // 2. Sync to Google Sheets
       try {
+        const headers: any = { 'Content-Type': 'application/json' };
+        if (spreadsheetId) {
+          headers['x-spreadsheet-id'] = spreadsheetId;
+        }
+        
         await fetch('/api/settings', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(data.settings)
         });
       } catch (sheetErr) {
@@ -1045,8 +1238,19 @@ export default function App() {
 
   const fetchData = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
-      const res = await fetch('/api/data');
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (spreadsheetId) {
+        headers['x-spreadsheet-id'] = spreadsheetId;
+      }
+      
+      const res = await fetch('/api/data', { headers });
+      if (!res.ok) {
+        const errorData = await res.json();
+        setFetchError({ status: res.status, message: errorData.details || errorData.error });
+        return;
+      }
       const json = await res.json();
       
       // Transform raw sheets data with safety checks
@@ -1172,11 +1376,16 @@ export default function App() {
         handleFirestoreError(error, OperationType.CREATE, 'bookings');
       }
 
-      // 2. Sync to Google Sheets (Secondary/Backup)
+      // 3. Sync to Google Sheets
       try {
+        const headers: any = { 'Content-Type': 'application/json' };
+        if (spreadsheetId) {
+          headers['x-spreadsheet-id'] = spreadsheetId;
+        }
+        
         await fetch('/api/bookings', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(bookingForm)
         });
       } catch (sheetErr) {
@@ -1231,9 +1440,14 @@ export default function App() {
 
       // 2. Sync to Google Sheets
       try {
+        const headers: any = { 'Content-Type': 'application/json' };
+        if (spreadsheetId) {
+          headers['x-spreadsheet-id'] = spreadsheetId;
+        }
+        
         await fetch(`/api/rooms/${editingRoom.roomId ? editingRoom.roomId : 'new'}`, {
           method: editingRoom.roomId ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ ...roomForm, id: finalId, roomId: editingRoom.roomId || finalId })
         });
       } catch (sheetErr) {
@@ -1267,9 +1481,14 @@ export default function App() {
 
       // 2. Sync to Google Sheets
       try {
+        const headers: any = { 'Content-Type': 'application/json' };
+        if (spreadsheetId) {
+          headers['x-spreadsheet-id'] = spreadsheetId;
+        }
+        
         await fetch('/api/promos', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(promoForm)
         });
       } catch (sheetErr) {
@@ -1473,11 +1692,39 @@ export default function App() {
   if (!user) {
     return (
       <LoginScreen 
-        onGoogleLogin={handleLogin} 
         onEmailLogin={handleEmailLogin} 
-        onEmailSignUp={handleEmailSignUp} 
         homestayName={data.settings['Homestay_Name']}
       />
+    );
+  }
+
+  if (!spreadsheetId) {
+    return (
+      <>
+        <WelcomeScreen onOpenConfig={() => setIsSaaSConfigOpen(true)} />
+        <SaaSConfigModal 
+          isOpen={isSaaSConfigOpen} 
+          onClose={() => setIsSaaSConfigOpen(false)} 
+          currentId={spreadsheetId}
+          serviceAccountEmail={data.serviceAccountEmail}
+          onSave={handleSaveSaaSConfig}
+        />
+      </>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <>
+        <SheetErrorScreen error={fetchError} onOpenConfig={() => setIsSaaSConfigOpen(true)} />
+        <SaaSConfigModal 
+          isOpen={isSaaSConfigOpen} 
+          onClose={() => setIsSaaSConfigOpen(false)} 
+          currentId={spreadsheetId}
+          serviceAccountEmail={data.serviceAccountEmail}
+          onSave={handleSaveSaaSConfig}
+        />
+      </>
     );
   }
 
@@ -1537,11 +1784,16 @@ export default function App() {
                 { id: 'rooms', icon: Bed, label: 'ห้องพัก' },
                 { id: 'promos', icon: Tag, label: 'โปรโมชั่น' },
                 { id: 'settings-system', icon: Settings, label: 'ตั้งค่าระบบ' },
+                { id: 'saas-config', icon: Database, label: 'ตั้งค่า SaaS' },
               ].map((item) => (
                 <button
                   key={item.id}
                   onClick={() => {
-                    setActiveTab(item.id);
+                    if (item.id === 'saas-config') {
+                      setIsSaaSConfigOpen(true);
+                    } else {
+                      setActiveTab(item.id);
+                    }
                     if (window.innerWidth < 1024) setIsSidebarOpen(false);
                   }}
                   className={`w-full flex items-center gap-5 px-6 py-4 lg:py-5 transition-all duration-500 group border-l-2 ${activeTab === item.id ? 'bg-mountain-mist text-mountain-forest border-mountain-gold' : 'text-white/60 hover:text-white border-transparent hover:bg-white/5'}`}
@@ -1585,6 +1837,13 @@ export default function App() {
 
       {/* Main Content */}
       <main className={`flex-1 h-screen overflow-y-auto p-6 md:p-12 lg:p-20 bg-mountain-mist transition-all duration-500 ${isSidebarOpen ? 'lg:pl-12' : ''}`}>
+        <SaaSConfigModal 
+          isOpen={isSaaSConfigOpen} 
+          onClose={() => setIsSaaSConfigOpen(false)} 
+          currentId={spreadsheetId}
+          serviceAccountEmail={data.serviceAccountEmail}
+          onSave={handleSaveSaaSConfig}
+        />
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 lg:mb-20">
           <motion.div
             initial={{ opacity: 0, x: -20 }}

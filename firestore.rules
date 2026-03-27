@@ -17,6 +17,9 @@ service cloud.firestore {
     // Collection: settings
     // Fields: ownerId, homestayName, homestaySuffix, heroSloganTop, heroDescription, contactPhone, contactEmail, contactLineId, contactFacebookUrl, contactAddress, bankName, bankAccountNo, bankAccountName, promptPayId, themePreset, fontStyle
     //
+    // Collection: userConfigs
+    // Fields: spreadsheetId, updatedAt
+    //
     // ===============================================================
 
     // ===============================================================
@@ -39,9 +42,9 @@ service cloud.firestore {
         (
           // Check if user has admin role in users collection
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-          // Fallback to hardcoded admin email
-          request.auth.token.email == "koporikkung@gmail.com"
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
+          // Fallback to hardcoded admin email (ensure verified)
+          (request.auth.token.email == "koporikkung@gmail.com" && request.auth.token.email_verified == true)
         );
     }
 
@@ -61,8 +64,7 @@ service cloud.firestore {
 
     match /bookings/{bookingId} {
       // Allow reading if the user is an admin OR if they are the owner of the document
-      // Note: For queries, this requires a where('ownerId', '==', request.auth.uid) filter
-      allow read: if isAuthenticated() && (isAdmin() || (resource != null && resource.data.ownerId == request.auth.uid) || (resource == null));
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
       
       allow create: if isAuthenticated() && 
         request.resource.data.ownerId == request.auth.uid &&
@@ -75,21 +77,21 @@ service cloud.firestore {
     }
 
     match /rooms/{roomId} {
-      allow read: if true;
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isAuthenticated() && (isAdmin() || (resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid));
       allow delete: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
     }
 
     match /promos/{promoId} {
-      allow read: if true;
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isAuthenticated() && (isAdmin() || (resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid));
       allow delete: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
     }
 
     match /settings/{settingsId} {
-      allow read: if true;
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isAuthenticated() && (isAdmin() || (resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid));
       allow delete: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
@@ -98,6 +100,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow write: if isAdmin();
+    }
+
+    match /userConfigs/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
     }
   }
 }

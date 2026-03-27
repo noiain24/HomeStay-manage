@@ -76,8 +76,21 @@
       },
       "required": ["ownerId", "homestayName"]
     }
+    "UserConfig": {
+      "title": "User Config",
+      "description": "User-specific configuration for the SaaS platform.",
+      "type": "object",
+      "properties": {
+        "spreadsheetId": { "type": "string", "description": "The ID of the user's Google Sheet." }
+      },
+      "required": ["spreadsheetId"]
+    }
   },
   "firestore": {
+    "/userConfigs/{userId}": {
+      "schema": "UserConfig",
+      "description": "User-specific configuration."
+    },
     "/bookings/{bookingId}": {
       "schema": "Booking",
       "description": "Collection of bookings."

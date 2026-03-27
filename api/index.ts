@@ -7,7 +7,12 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID || "18enn4tE_3yCxfYha-qha6_S7ifzZ2ulRX8bnPhQrweQ";
+const DEFAULT_SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID || "18enn4tE_3yCxfYha-qha6_S7ifzZ2ulRX8bnPhQrweQ";
+
+// Helper to get spreadsheet ID from request
+const getSpreadsheetId = (req: express.Request) => {
+  return (req.headers['x-spreadsheet-id'] as string) || DEFAULT_SPREADSHEET_ID;
+};
 
 // Google Sheets Auth Helper
 const getSheetsClient = async () => {
@@ -29,6 +34,7 @@ const getSheetsClient = async () => {
 // API Routes
 app.get("/api/data", async (req, res) => {
   try {
+    const spreadsheetId = getSpreadsheetId(req);
     const sheets = await getSheetsClient();
     if (!sheets) {
       console.warn("Google Sheets credentials missing. Using mock data.");
@@ -36,7 +42,7 @@ app.get("/api/data", async (req, res) => {
     }
 
     const spreadsheet = await sheets.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
     });
     const sheetNames = spreadsheet.data.sheets?.map(s => s.properties?.title || "") || [];
 
@@ -55,7 +61,7 @@ app.get("/api/data", async (req, res) => {
       if (!sheetName) return;
       try {
         const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
+          spreadsheetId: spreadsheetId,
           range: `${sheetName}!A:N`,
         });
         results[key] = response.data.values || [];
@@ -68,18 +74,28 @@ app.get("/api/data", async (req, res) => {
     
     res.json({
       ...results,
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       serviceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       actualSheetNames: actualNames
     });
   } catch (error: any) {
     console.error("Error fetching sheets data:", error.message || error);
-    res.status(500).json({ error: "Failed to fetch data", details: error.message || String(error) });
+    const status = error.code || 500;
+    const message = error.message || "Failed to fetch data";
+    
+    if (status === 403) {
+      res.status(403).json({ error: "Permission denied", details: "Please share the spreadsheet with the service account email." });
+    } else if (status === 404) {
+      res.status(404).json({ error: "Spreadsheet not found", details: "The provided Spreadsheet ID is invalid." });
+    } else {
+      res.status(status).json({ error: message, details: error.message || String(error) });
+    }
   }
 });
 
 app.post("/api/bookings", async (req, res) => {
   try {
+    const spreadsheetId = getSpreadsheetId(req);
     const sheets = await getSheetsClient();
     if (!sheets) return res.status(400).json({ error: "Google Sheets credentials missing." });
 
@@ -106,7 +122,7 @@ app.post("/api/bookings", async (req, res) => {
     ]];
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: "Bookings!A:Q",
       valueInputOption: "USER_ENTERED",
       requestBody: { values },
@@ -120,18 +136,19 @@ app.post("/api/bookings", async (req, res) => {
 
 app.post("/api/rooms/new", async (req, res) => {
   try {
+    const spreadsheetId = getSpreadsheetId(req);
     const sheets = await getSheetsClient();
     if (!sheets) return res.status(400).json({ error: "Google Sheets credentials missing." });
 
     const { id, name, capacity, price, status, imageUrl, description, amenities } = req.body;
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: spreadsheetId });
     const sheetNames = spreadsheet.data.sheets?.map(s => s.properties?.title || "") || [];
     const sheetName = sheetNames.find(name => ["Rooms", "Room", "Accommodation", "Catalog"].some(k => name.toLowerCase().includes(k.toLowerCase())));
 
     if (!sheetName) return res.status(404).json({ error: "Rooms sheet not found" });
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: `${sheetName}!A:H`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
@@ -147,20 +164,21 @@ app.post("/api/rooms/new", async (req, res) => {
 
 app.put("/api/rooms/:id", async (req, res) => {
   try {
+    const spreadsheetId = getSpreadsheetId(req);
     const sheets = await getSheetsClient();
     if (!sheets) return res.status(400).json({ error: "Google Sheets credentials missing." });
 
     const { id } = req.params;
     const { name, capacity, price, status, imageUrl, description, amenities } = req.body;
 
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: spreadsheetId });
     const sheetNames = spreadsheet.data.sheets?.map(s => s.properties?.title || "") || [];
     const sheetName = sheetNames.find(name => ["Rooms", "Room", "Accommodation", "Catalog"].some(k => name.toLowerCase().includes(k.toLowerCase())));
 
     if (!sheetName) return res.status(404).json({ error: "Rooms sheet not found" });
 
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: `${sheetName}!A:A`,
     });
     const rows = response.data.values || [];
@@ -169,7 +187,7 @@ app.put("/api/rooms/:id", async (req, res) => {
     if (rowIndex === -1) return res.status(404).json({ error: "Room not found" });
 
     await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: `${sheetName}!A${rowIndex + 1}:H${rowIndex + 1}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
@@ -185,20 +203,21 @@ app.put("/api/rooms/:id", async (req, res) => {
 
 app.post("/api/promos", async (req, res) => {
   try {
+    const spreadsheetId = getSpreadsheetId(req);
     const sheets = await getSheetsClient();
     if (!sheets) return res.status(400).json({ error: "Google Sheets credentials missing." });
 
     const { name, code, discount, startDate, endDate, status } = req.body;
     const values = [[name, discount, code, startDate, endDate, status]];
 
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: spreadsheetId });
     const sheetNames = spreadsheet.data.sheets?.map(s => s.properties?.title || "") || [];
     const sheetName = sheetNames.find(name => ["Promotions", "Promos", "Promotion", "Offer", "Discount"].some(k => name.toLowerCase().includes(k.toLowerCase())));
 
     if (!sheetName) return res.status(404).json({ error: "Promotions sheet not found" });
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: `${sheetName}!A:F`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values },
@@ -212,18 +231,19 @@ app.post("/api/promos", async (req, res) => {
 
 app.put("/api/settings", async (req, res) => {
   try {
+    const spreadsheetId = getSpreadsheetId(req);
     const sheets = await getSheetsClient();
     if (!sheets) return res.status(400).json({ error: "Google Sheets credentials missing." });
 
     const settingsData = req.body;
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: spreadsheetId });
     const sheetNames = spreadsheet.data.sheets?.map(s => s.properties?.title || "") || [];
     const sheetName = sheetNames.find(name => ["Setting", "Settings", "Config"].some(k => name.toLowerCase().includes(k.toLowerCase())));
 
     if (!sheetName) return res.status(404).json({ error: "Settings sheet not found" });
 
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: `${sheetName}!1:1`,
     });
     const headers = response.data.values?.[0] || [];
@@ -231,7 +251,7 @@ app.put("/api/settings", async (req, res) => {
 
     const values = [headers.map(header => settingsData[header] || "")];
     await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: `${sheetName}!A2`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values },
